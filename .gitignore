@@ -117,3 +117,13 @@ docker-compose.override.yml
 *.bak
 *.orig
 edo.txt
+
+# ── Uploaded files (runtime generated) ───────────────────────────────────────
+backend/data/uploads/
+
+# ── Audio temp files ──────────────────────────────────────────────────────────
+*.webm
+*.wav
+*.mp3
+*.ogg
+*.m4a

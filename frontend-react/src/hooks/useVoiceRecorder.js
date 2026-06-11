@@ -1,11 +1,17 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 
-const SUPPORTED_MIME = [
-  "audio/webm;codecs=opus",
-  "audio/webm",
-  "audio/ogg;codecs=opus",
-  "audio/mp4",
-].find((t) => MediaRecorder.isTypeSupported(t)) || "";
+function getSupportedMime() {
+  if (typeof MediaRecorder === "undefined") return "";
+  const types = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/ogg;codecs=opus",
+    "audio/mp4",
+  ];
+  return types.find((t) => MediaRecorder.isTypeSupported(t)) || "";
+}
+
+const SUPPORTED_MIME = getSupportedMime();
 
 export function useVoiceRecorder() {
   const [state, setState]         = useState("idle"); // idle | recording | processing | done | error

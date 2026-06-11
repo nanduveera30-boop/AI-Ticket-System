@@ -5,7 +5,9 @@ import client from "./client";
  */
 export const transcribeAudio = (blob, token) => {
   const form = new FormData();
-  form.append("audio", blob, "recording.webm");
+  // Force plain webm MIME so backend validation passes regardless of codec variant
+  const cleanBlob = new Blob([blob], { type: "audio/webm" });
+  form.append("audio", cleanBlob, "recording.webm");
   return client
     .post("/voice/transcribe", form, {
       headers: {
@@ -16,12 +18,10 @@ export const transcribeAudio = (blob, token) => {
     .then((r) => r.data);
 };
 
-/**
- * Process audio blob — returns full ProcessTicketResponse
- */
 export const processVoiceTicket = (blob, token) => {
   const form = new FormData();
-  form.append("audio", blob, "recording.webm");
+  const cleanBlob = new Blob([blob], { type: "audio/webm" });
+  form.append("audio", cleanBlob, "recording.webm");
   return client
     .post("/voice/process", form, {
       headers: {

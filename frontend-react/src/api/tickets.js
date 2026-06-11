@@ -1,6 +1,13 @@
 import client from "./client";
 
 export const processTicket      = (p) => client.post("/process-ticket", p).then(r => r.data);
+export const uploadAttachment   = (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  return client.post("/tickets/upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" }
+  }).then(r => r.data);
+};
 export const createTicket       = (p) => client.post("/tickets", p).then(r => r.data);
 export const listTickets        = (params) => client.get("/tickets", { params }).then(r => r.data);
 export const getTicket          = (id) => client.get(`/tickets/${id}`).then(r => r.data);

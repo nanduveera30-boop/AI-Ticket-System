@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List, Optional
+import os
+import secrets
 
 from app.db.database import get_db
-from app.db.models import Ticket, Prediction, AuditLog
+from app.db.models import Ticket, Prediction, AuditLog, User
 from app.schemas.ticket import TicketCreate, TicketResponse, ProcessTicketResponse
 from app.services.ai_pipeline import run_pipeline
 from app.workers.tasks import persist_prediction, persist_audit_log
@@ -36,6 +38,10 @@ def process_ticket(
     current_user: dict = Depends(get_current_user),
 ):
     ticket = Ticket(**payload.model_dump())
+    # Attach customer_id if the caller is a customer
+    user = db.query(User).filter(User.username == current_user["username"]).first()
+    if user:
+        ticket.customer_id = user.id
     db.add(ticket)
     db.commit()
     db.refresh(ticket)
@@ -70,6 +76,9 @@ def list_tickets(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
+    role = current_user.get("role", "customer")
+    if role not in ("admin", "agent"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
     q = db.query(Ticket)
     if priority:
         q = q.filter(Ticket.priority == priority)
@@ -85,6 +94,16 @@ def get_ticket(
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail=f"Ticket {ticket_id} not found")
+
+    role = current_user.get("role", "customer")
+    if role == "customer":
+        user_id = current_user.get("id")
+        if not user_id:
+            user = db.query(User).filter(User.username == current_user["username"]).first()
+            user_id = user.id if user else None
+        if ticket.customer_id != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to view this ticket")
+
     return ticket
 
 
@@ -102,12 +121,28 @@ def get_ticket_prediction(
     )
     if not prediction:
         raise HTTPException(status_code=404, detail="No prediction found for this ticket")
+
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if ticket:
+        role = current_user.get("role", "customer")
+        if role == "customer":
+            user_id = current_user.get("id")
+            if not user_id:
+                user = db.query(User).filter(User.username == current_user["username"]).first()
+                user_id = user.id if user else None
+            if ticket.customer_id != user_id:
+                raise HTTPException(status_code=403, detail="Not authorized to view this ticket's prediction")
+
     return {
-        "ticket_id": ticket_id,
-        "confidence": prediction.confidence,
-        "risk": prediction.risk,
-        "action": prediction.action,
-        "created_at": prediction.created_at,
+        "ticket_id":        ticket_id,
+        "confidence":       prediction.confidence,
+        "risk":             prediction.risk,
+        "action":           prediction.action,
+        "ticket_category":  prediction.ticket_category,
+        "financial_category": prediction.financial_category,
+        "ai_explanation":   prediction.ai_explanation,
+        "apology_message":  prediction.apology_message,
+        "created_at":       prediction.created_at,
     }
 
 
@@ -169,3 +204,69 @@ def get_audit_logs(
         }
         for l in logs
     ]
+
+
+@router.get("/my-tickets", response_model=List[TicketResponse])
+def my_tickets(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    status: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Customer: list only their own tickets."""
+    user_id = current_user.get("id")
+    if not user_id:
+        user = db.query(User).filter(User.username == current_user["username"]).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        user_id = user.id
+    q = db.query(Ticket).filter(Ticket.customer_id == user_id)
+    if status:
+        q = q.filter(Ticket.status == status)
+    return q.order_by(Ticket.created_at.desc()).offset(skip).limit(limit).all()
+
+
+@router.patch("/tickets/{ticket_id}/status")
+def update_ticket_status(
+    ticket_id: int,
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Admin/agent: update ticket status."""
+    from app.core.security import require_role
+    role = current_user.get("role", "customer")
+    if role not in ("admin", "agent"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    allowed_statuses = {"open", "in_progress", "escalated", "resolved", "closed"}
+    new_status = payload.get("status")
+    if new_status not in allowed_statuses:
+        raise HTTPException(status_code=422, detail=f"Invalid status. Must be one of: {allowed_statuses}")
+
+    ticket.status = new_status
+    if payload.get("assigned_to"):
+        ticket.assigned_to = payload["assigned_to"]
+    db.commit()
+    db.refresh(ticket)
+    logger.info("ticket_status_updated", ticket_id=ticket_id, status=new_status, actor=current_user["username"])
+    return {"ticket_id": ticket_id, "status": ticket.status}
+
+
+@router.post("/tickets/upload", status_code=201)
+async def upload_attachment(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+):
+    ext = file.filename.split(".")[-1]
+    filename = f"{secrets.token_hex(8)}.{ext}"
+    os.makedirs("data/uploads", exist_ok=True)
+    filepath = f"data/uploads/{filename}"
+    with open(filepath, "wb") as f:
+        f.write(await file.read())
+    return {"attachment_url": f"/uploads/{filename}"}

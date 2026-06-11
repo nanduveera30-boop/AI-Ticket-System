@@ -44,6 +44,28 @@ def test_get_ticket_not_found(client, auth_headers):
     assert res.status_code == 404
 
 
+def test_customer_cannot_access_others_ticket(client):
+    """Test RBAC rule where customers can't view random tickets."""
+    # 1. Create a ticket as an agent (or another user)
+    client.post("/auth/register", json={
+        "username": "adminuser", "email": "a@a.com", "password": "pass", "role": "agent"
+    })
+    admin_token = client.post("/auth/token", json={"username": "adminuser", "password": "pass"}).json()["access_token"]
+    create = client.post("/tickets", json=TICKET_PAYLOAD, headers={"Authorization": f"Bearer {admin_token}"})
+    ticket_id = create.json()["id"]
+
+    # 2. Login as a new customer
+    client.post("/auth/register", json={
+        "username": "cust1", "email": "c1@c.com", "password": "pass", "role": "customer"
+    })
+    cust_token = client.post("/auth/token", json={"username": "cust1", "password": "pass"}).json()["access_token"]
+    
+    # 3. Try to access the admin's ticket
+    res = client.get(f"/tickets/{ticket_id}", headers={"Authorization": f"Bearer {cust_token}"})
+    assert res.status_code == 403
+    assert res.json()["detail"] == "Not authorized to view this ticket"
+
+
 def test_list_tickets(client, auth_headers):
     client.post("/tickets", json=TICKET_PAYLOAD, headers=auth_headers)
     res = client.get("/tickets", headers=auth_headers)

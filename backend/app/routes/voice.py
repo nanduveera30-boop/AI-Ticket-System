@@ -21,14 +21,20 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/voice", tags=["voice"])
 
 ALLOWED_TYPES = {
-    "audio/webm", "audio/wav", "audio/wave", "audio/mpeg",
-    "audio/mp4", "audio/ogg", "audio/x-m4a", "audio/mp3",
+    "audio/webm", "audio/webm;codecs=opus", "audio/webm;codecs=vp8",
+    "audio/wav", "audio/wave", "audio/x-wav",
+    "audio/mpeg", "audio/mp3", "audio/mp4",
+    "audio/ogg", "audio/ogg;codecs=opus",
+    "audio/x-m4a", "audio/aac",
 }
 MAX_SIZE_MB = 10
 
 
 def _validate_audio(file: UploadFile) -> None:
-    if file.content_type and file.content_type not in ALLOWED_TYPES:
+    # Strip codec params for comparison: "audio/webm;codecs=opus" → "audio/webm"
+    ct = (file.content_type or "").split(";")[0].strip().lower()
+    base_allowed = {t.split(";")[0].strip() for t in ALLOWED_TYPES}
+    if ct and ct not in base_allowed and ct != "application/octet-stream":
         raise HTTPException(
             status_code=415,
             detail=f"Unsupported audio format: {file.content_type}. Supported: webm, wav, mp3, ogg, m4a",
@@ -38,13 +44,15 @@ def _validate_audio(file: UploadFile) -> None:
 def _get_extension(file: UploadFile) -> str:
     if file.filename:
         ext = file.filename.rsplit(".", 1)[-1].lower()
-        return ext if ext in ("webm", "wav", "mp3", "ogg", "m4a") else "webm"
-    ct = file.content_type or ""
-    if "wav" in ct:   return "wav"
-    if "mpeg" in ct or "mp3" in ct: return "mp3"
-    if "ogg" in ct:   return "ogg"
-    if "m4a" in ct:   return "m4a"
-    return "webm"
+        if ext in ("webm", "wav", "mp3", "ogg", "m4a", "mp4", "aac"):
+            return ext
+    ct = (file.content_type or "").lower()
+    if "wav" in ct:                    return "wav"
+    if "mpeg" in ct or "mp3" in ct:    return "mp3"
+    if "ogg" in ct:                    return "ogg"
+    if "m4a" in ct or "aac" in ct:     return "m4a"
+    if "mp4" in ct:                    return "mp4"
+    return "webm"  # default — Chrome/Firefox record as webm
 
 
 @router.post("/transcribe")
@@ -65,7 +73,10 @@ async def transcribe(
     transcript = transcribe_audio(audio_bytes, ext)
 
     if not transcript:
-        raise HTTPException(status_code=422, detail="Could not transcribe audio — please speak clearly")
+        raise HTTPException(
+            status_code=422,
+            detail="Could not transcribe audio. Install ffmpeg for best results: https://ffmpeg.org/download.html"
+        )
 
     fields = extract_ticket_fields(transcript)
     logger.info("voice_transcribed", actor=current_user["username"], length=len(transcript))

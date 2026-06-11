@@ -1,22 +1,30 @@
 const PAGE_TITLES = {
-  dashboard: "Dashboard",
-  tickets:   "Tickets",
-  voice:     "Voice Assistant",
+  dashboard: "Intelligence Overview",
+  tickets:   "All Tickets",
+  voice:     "Voice Studio",
   audit:     "Audit Logs",
-  metrics:   "Metrics",
-  admin:     "Admin Portal",
+  metrics:   "AI Insights",
+  admin:     "Admin Panel",
 };
 
 export default function Topbar({ page, online }) {
-  const isOnline = online === true;
+  const isOnline   = online === true;
   const isChecking = online === null;
 
   return (
     <div className="topbar">
-      <span className="topbar-title">{PAGE_TITLES[page] || "Dashboard"}</span>
+      <div>
+        <span className="topbar-title">{PAGE_TITLES[page] || "Dashboard"}</span>
+      </div>
       <div className="topbar-status">
         <span className={`status-dot${isOnline ? " online" : isChecking ? "" : " offline"}`} />
-        <span>{isChecking ? "Connecting..." : isOnline ? "API Online" : "API Offline"}</span>
+        <span>{isChecking ? "Connecting…" : isOnline ? "API Online" : "API Offline"}</span>
+        {isOnline && (
+          <span style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: 8, fontSize: 11, color: "var(--primary-container)", fontWeight: 600 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>security</span>
+            Encrypted
+          </span>
+        )}
       </div>
     </div>
   );

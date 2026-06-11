@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     # Rate limiting
     RATE_LIMIT_PER_MINUTE: int = 60
 
+    # Gemini AI
+    GEMINI_API_KEY: str = ""
+
     # CORS — comma-separated origins
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
 

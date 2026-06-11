@@ -1,7 +1,7 @@
-import MetricsRow    from "../components/MetricsRow";
+import MetricsRow from "../components/MetricsRow";
 import { DonutChart, ConfidenceLine } from "../components/Charts";
-import TicketForm    from "../components/TicketForm";
-import TicketLog     from "../components/TicketLog";
+import TicketForm from "../components/TicketForm";
+import TicketLog  from "../components/TicketLog";
 
 export default function DashboardPage({ metrics, confidenceHistory, log, onResult }) {
   return (

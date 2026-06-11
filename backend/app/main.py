@@ -20,6 +20,8 @@ from app.db.models import Base
 from app.routes import tickets, metrics, auth
 from app.routes.voice import router as voice_router
 from app.routes.admin import router as admin_router
+from app.routes.chat import router as chat_router
+from app.routes.faq import router as faq_router
 from app.services.embeddings import get_model
 from app.services.rag import load_index
 from app.services.classifier import get_ticket_classifier, get_zero_shot_classifier
@@ -33,6 +35,9 @@ logger = get_logger(__name__)
 limiter = Limiter(key_func=get_remote_address, default_limits=[f"{settings.RATE_LIMIT_PER_MINUTE}/minute"])
 
 
+from app.workers.tasks import auto_escalate_tickets
+import asyncio
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("startup_begin", environment=settings.ENVIRONMENT)
@@ -42,8 +47,13 @@ async def lifespan(app: FastAPI):
     get_ticket_classifier()
     get_zero_shot_classifier()
     get_whisper_model()
+    
+    # Start auto-escalation worker
+    escalate_task = asyncio.create_task(auto_escalate_tickets())
+    
     logger.info("startup_complete")
     yield
+    escalate_task.cancel()
     logger.info("shutdown")
 
 
@@ -89,9 +99,17 @@ async def request_id_middleware(request: Request, call_next):
     response.headers["X-Request-ID"] = request_id
     return response
 
+# Static files for uploads
+from fastapi.staticfiles import StaticFiles
+import os
+os.makedirs("data/uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="data/uploads"), name="uploads")
+
 # Routers
 app.include_router(auth.router)
 app.include_router(tickets.router)
 app.include_router(metrics.router)
 app.include_router(voice_router)
 app.include_router(admin_router)
+app.include_router(chat_router)
+app.include_router(faq_router)

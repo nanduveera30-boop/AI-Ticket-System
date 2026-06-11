@@ -2,22 +2,22 @@ const NAV = [
   {
     section: "Operations",
     items: [
-      { id: "dashboard",  icon: "▦",  label: "Dashboard" },
-      { id: "tickets",    icon: "🎫", label: "Tickets" },
-      { id: "voice",      icon: "🎙", label: "Voice Assistant" },
+      { id: "dashboard", icon: "dashboard",            label: "Overview" },
+      { id: "tickets",   icon: "confirmation_number",  label: "All Tickets" },
+      { id: "voice",     icon: "mic_none",             label: "Voice Studio" },
     ],
   },
   {
     section: "Analytics",
     items: [
-      { id: "audit",      icon: "📋", label: "Audit Logs" },
-      { id: "metrics",    icon: "📊", label: "Metrics" },
+      { id: "audit",   icon: "history_edu", label: "Audit Logs" },
+      { id: "metrics", icon: "analytics",   label: "AI Insights" },
     ],
   },
   {
     section: "Administration",
     items: [
-      { id: "admin",      icon: "⚙",  label: "Admin Portal", adminOnly: true },
+      { id: "admin", icon: "admin_panel_settings", label: "Admin Panel", adminOnly: true },
     ],
   },
 ];
@@ -29,10 +29,12 @@ export default function Sidebar({ page, onNav, user, onLogout }) {
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
-        <div className="sidebar-logo-icon">AI</div>
+        <div className="sidebar-logo-icon">
+          <span className="material-symbols-outlined" style={{ fontSize: 18, color: "#fff", fontVariationSettings: "'FILL' 1" }}>psychology</span>
+        </div>
         <div>
-          <div className="sidebar-logo-text">TicketAI</div>
-          <div className="sidebar-logo-sub">Resolution System</div>
+          <div className="sidebar-logo-text">ResolvAI</div>
+          <div className="sidebar-logo-sub">Precision Curator</div>
         </div>
       </div>
 
@@ -49,7 +51,7 @@ export default function Sidebar({ page, onNav, user, onLogout }) {
                   className={`nav-item${page === item.id ? " active" : ""}`}
                   onClick={() => onNav(item.id)}
                 >
-                  <span className="nav-icon">{item.icon}</span>
+                  <span className="material-symbols-outlined nav-icon" style={{ fontSize: 18, fontVariationSettings: page === item.id ? "'FILL' 1" : "'FILL' 0" }}>{item.icon}</span>
                   {item.label}
                 </button>
               ))}
@@ -65,7 +67,9 @@ export default function Sidebar({ page, onNav, user, onLogout }) {
             <div className="sidebar-username">{user?.username}</div>
             <div className="sidebar-role">{user?.role || "agent"}</div>
           </div>
-          <button className="btn-signout" onClick={onLogout} title="Sign out">⏻</button>
+          <button className="btn-signout" onClick={onLogout} title="Sign out">
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>logout</span>
+          </button>
         </div>
       </div>
     </aside>

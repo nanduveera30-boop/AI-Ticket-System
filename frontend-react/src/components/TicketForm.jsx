@@ -3,13 +3,19 @@ import { processTicket, checkDuplicate } from "../api/tickets";
 import { BATCH_TICKETS } from "../utils/constants";
 import ResultPanel from "./ResultPanel";
 
+const PRIORITIES = [
+  { value: "P1", label: "P1 — Critical" },
+  { value: "P2", label: "P2 — High" },
+  { value: "P3", label: "P3 — Normal" },
+];
+
 export default function TicketForm({ onResult }) {
-  const [form, setForm]         = useState({ title: "", description: "", priority: "P2", user_type: "STANDARD" });
-  const [result, setResult]     = useState(null);
-  const [duplicate, setDup]     = useState(null);
-  const [loading, setLoading]   = useState(false);
-  const [batching, setBatch]    = useState(false);
-  const [error, setError]       = useState(null);
+  const [form, setForm]     = useState({ title: "", description: "", priority: "P2", user_type: "STANDARD" });
+  const [result, setResult] = useState(null);
+  const [duplicate, setDup] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [batching, setBatch]  = useState(false);
+  const [error, setError]     = useState(null);
 
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
 
@@ -17,22 +23,15 @@ export default function TicketForm({ onResult }) {
     e.preventDefault();
     setLoading(true); setError(null); setDup(null); setResult(null);
     try {
-      // Check duplicate first
       const dupCheck = await checkDuplicate(form);
-      if (dupCheck.is_duplicate) {
-        setDup(dupCheck);
-        setLoading(false);
-        return;
-      }
+      if (dupCheck.is_duplicate) { setDup(dupCheck); setLoading(false); return; }
       const data = await processTicket(form);
       setResult(data);
       onResult(data, { title: form.title, priority: form.priority, user_type: form.user_type });
       setForm(f => ({ ...f, title: "", description: "" }));
     } catch (err) {
       setError(err.response?.data?.detail || "Request failed. Is the API running?");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }
 
   async function handleBatch() {
@@ -51,23 +50,25 @@ export default function TicketForm({ onResult }) {
     <div className="card">
       <div className="card-header">
         <div>
-          <div className="card-title">Submit Ticket</div>
+          <div className="card-title">Process Ticket</div>
           <div className="card-sub">Duplicate detection + AI classification</div>
         </div>
+        <button type="button" className="btn-secondary btn-sm" onClick={handleBatch} disabled={batching}>
+          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>play_arrow</span>
+          {batching ? "Running…" : "Batch Simulation"}
+        </button>
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <div className="form-group" style={{ marginBottom: 12 }}>
-          <label className="form-label">Title</label>
+      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div className="form-group">
+          <label className="form-label">Issue Title</label>
           <input className="form-input" type="text" placeholder="Brief description of the issue" required minLength={3} maxLength={255} value={form.title} onChange={set("title")} />
         </div>
-        <div className="form-row" style={{ marginBottom: 12 }}>
+        <div className="form-row">
           <div className="form-group">
             <label className="form-label">Priority</label>
             <select className="form-select" value={form.priority} onChange={set("priority")}>
-              <option value="P1">P1 — Critical</option>
-              <option value="P2">P2 — High</option>
-              <option value="P3">P3 — Normal</option>
+              {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
             </select>
           </div>
           <div className="form-group">
@@ -78,17 +79,20 @@ export default function TicketForm({ onResult }) {
             </select>
           </div>
         </div>
-        <div className="form-group" style={{ marginBottom: 14 }}>
+        <div className="form-group">
           <label className="form-label">Description</label>
           <textarea className="form-textarea" placeholder="Detailed description (min 10 chars)" required minLength={10} value={form.description} onChange={set("description")} />
         </div>
 
-        {error && <p className="form-error" style={{ marginBottom: 10 }}>{error}</p>}
+        {error && <div className="form-error">{error}</div>}
 
         {duplicate && (
-          <div className="duplicate-alert" style={{ marginBottom: 12 }}>
-            <strong>⚠ Duplicate Detected</strong>
-            {duplicate.message}
+          <div className="duplicate-alert">
+            <strong>
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>warning</span>
+              Duplicate Detected
+            </strong>
+            <p style={{ fontSize: 12, marginBottom: 8 }}>{duplicate.message}</p>
             {duplicate.duplicates.map(d => (
               <div className="duplicate-match" key={d.ticket_id}>
                 Ticket #{d.ticket_id} — {d.title} ({(d.similarity * 100).toFixed(1)}% match)
@@ -102,8 +106,10 @@ export default function TicketForm({ onResult }) {
         )}
 
         <div className="form-actions">
-          <button type="submit" className="btn-primary" disabled={loading}>{loading ? "Processing…" : "Process Ticket"}</button>
-          <button type="button" className="btn-secondary" onClick={handleBatch} disabled={batching}>{batching ? "Running…" : "Batch Simulation"}</button>
+          <button type="submit" className="btn-primary" disabled={loading}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>send</span>
+            {loading ? "Processing…" : "Process Ticket"}
+          </button>
         </div>
       </form>
 

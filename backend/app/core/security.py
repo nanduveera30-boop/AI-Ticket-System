@@ -45,7 +45,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
     username: str = payload.get("sub")
     if not username:
         raise HTTPException(status_code=401, detail="Invalid token payload")
-    return {"username": username, "role": payload.get("role", "agent")}
+    return {"username": username, "role": payload.get("role", "customer"), "id": payload.get("user_id")}
 
 
 def require_role(*roles: str):
