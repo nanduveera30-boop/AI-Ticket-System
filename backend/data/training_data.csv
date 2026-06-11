@@ -1,0 +1,96 @@
+text,label
+I was charged twice for my subscription this month and need a refund immediately,Billing Question
+My credit card was billed incorrectly and the amount does not match my order,Billing Question
+Invoice shows wrong amount please correct and resend the updated invoice,Billing Question
+I need to cancel my subscription and get a refund for unused months,Billing Question
+Payment was deducted but my account still shows unpaid status,Billing Question
+I was overcharged on my last invoice and need the difference refunded,Billing Question
+My billing cycle changed without notice and I was charged early,Billing Question
+I cannot find my invoice for last month in the billing section,Billing Question
+The discount code was not applied to my invoice please fix the charge,Billing Question
+I need a receipt for my last payment for tax purposes,Billing Question
+My annual subscription renewed automatically but I wanted to cancel it,Billing Question
+Refund not processed after 7 days of approval please check status,Billing Question
+Wrong currency shown on invoice my account is set to EUR not USD,Billing Question
+I was charged for a plan I downgraded from last week,Billing Question
+My payment method was charged but I received no confirmation email,Billing Question
+The app keeps crashing every time I try to open the dashboard,Technical Issue
+I get a 500 internal server error when calling the export API endpoint,Technical Issue
+Application crashes on startup with error code 0x80004005 on Windows,Technical Issue
+The login page is not loading and shows a blank white screen,Technical Issue
+My data export has been stuck at 0 percent for over two hours,Technical Issue
+Two factor authentication codes are being rejected by the system,Technical Issue
+The mobile app is not syncing with the web dashboard since yesterday,Technical Issue
+Search functionality returns no results for any query after the update,Technical Issue
+Email notifications are not being sent for critical system events,Technical Issue
+Installation fails at 67 percent with error MSI2045 on Windows 11,Technical Issue
+The API is returning 404 errors for endpoints that worked yesterday,Technical Issue
+Dashboard takes over 30 seconds to load and shows timeout errors,Technical Issue
+I cannot upload files larger than 10MB even though the limit is 100MB,Technical Issue
+The password reset link expires immediately after clicking it,Technical Issue
+My account shows logged out every 5 minutes despite remember me being enabled,Technical Issue
+Database connection errors appearing in logs since the last deployment,Technical Issue
+The webhook is not firing for new events in our integration,Technical Issue
+SSL certificate error appearing when accessing the admin panel,Technical Issue
+The bulk import feature fails silently with no error message shown,Technical Issue
+Charts on the analytics page are not rendering any data,Technical Issue
+What are your business hours for customer support,General Inquiry
+How do I export my data from the platform to a CSV file,General Inquiry
+Can you explain how the confidence scoring system works,General Inquiry
+What is the difference between the standard and VIP plans,General Inquiry
+How long does it take to process a refund request,General Inquiry
+Where can I find the API documentation for your platform,General Inquiry
+What payment methods do you accept for subscriptions,General Inquiry
+How do I add a new team member to my organization account,General Inquiry
+Is there a free trial available before purchasing a subscription,General Inquiry
+What is your data retention policy for deleted accounts,General Inquiry
+How do I change the primary email address on my account,General Inquiry
+Can I transfer my subscription to a different account,General Inquiry
+What are the system requirements for running your desktop application,General Inquiry
+How do I enable two factor authentication on my account,General Inquiry
+Where can I download the latest version of the application,General Inquiry
+I would love to see a dark mode option added to the dashboard,Feature Request
+Please add the ability to export reports in PDF format,Feature Request
+It would be great to have bulk ticket assignment for team leads,Feature Request
+Can you add keyboard shortcuts for common actions in the interface,Feature Request
+I would like to see a mobile app for Android in addition to iOS,Feature Request
+Please add integration with Slack for ticket notifications,Feature Request
+It would be helpful to have a calendar view for scheduled tasks,Feature Request
+Can you add support for multiple languages in the interface,Feature Request
+I would like the ability to create custom ticket categories,Feature Request
+Please add an API endpoint for bulk ticket creation,Feature Request
+It would be great to have automated weekly summary reports by email,Feature Request
+Can you add a search filter for tickets by date range,Feature Request
+I would like to see real time collaboration on ticket comments,Feature Request
+Please add the ability to attach files larger than 10MB to tickets,Feature Request
+It would be helpful to have a public status page for system uptime,Feature Request
+My credit card statement shows a charge I do not recognize from your company,Billing Question
+The subscription price increased without any prior notification to me,Billing Question
+I need an itemized invoice showing all charges for the past 6 months,Billing Question
+My free trial ended but I was charged before I could cancel,Billing Question
+The promo code I applied is not reflected in my current invoice,Billing Question
+I cannot access my account after the password reset link expired,Technical Issue
+The API rate limit is too low for our production integration needs,Technical Issue
+My account was locked after 3 failed login attempts and unlock email not working,Technical Issue
+The admin panel is inaccessible after my role was updated by IT,Technical Issue
+Profile picture upload fails with a 422 validation error every time,Technical Issue
+How do I downgrade my subscription from enterprise to standard plan,General Inquiry
+What happens to my data if I cancel my subscription today,General Inquiry
+Can I use the platform API without a paid subscription,General Inquiry
+How do I contact your enterprise sales team for a custom quote,General Inquiry
+What is the SLA for P1 critical ticket resolution,General Inquiry
+Please add the ability to set custom SLA rules per ticket priority,Feature Request
+I would like a Zapier integration for automating ticket workflows,Feature Request
+Can you add role based access control with custom permission sets,Feature Request
+Please add a Gantt chart view for project ticket tracking,Feature Request
+I would like the option to schedule maintenance windows in the system,Feature Request
+VIP account lost access to premium features after billing renewal,Billing Question
+Subscription activated but premium features are still locked,Billing Question
+I was charged for an add-on I never requested or approved,Billing Question
+My payment failed but the system still shows my account as active,Billing Question
+I need to update my billing address for future invoices,Billing Question
+The desktop application freezes when processing large datasets,Technical Issue
+Webhook events are being delivered with a 30 minute delay,Technical Issue
+The OAuth integration stopped working after the latest platform update,Technical Issue
+My API key was revoked without any notification or reason given,Technical Issue
+The batch processing job fails after exactly 100 records every time,Technical Issue

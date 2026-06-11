@@ -38,6 +38,10 @@ class Explanation(BaseModel):
     reason: str
     similarity_matches: List[SimilarTicket]
     confidence_breakdown: ConfidenceBreakdown
+    # Real model outputs
+    ticket_category: str        # Billing Question | Technical Issue | General Inquiry | Feature Request
+    financial_category: str     # credit card | bank account | loans | mortgage | investments
+    classifier_confidence: float  # raw DistilBERT confidence score
 
 
 class ProcessTicketResponse(BaseModel):

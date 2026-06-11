@@ -205,7 +205,70 @@ curl -X POST http://localhost:8000/process-ticket \
 
 ---
 
-## Seed Data + Simulation
+## Training Your Own Classifier
+
+The system uses a DistilBERT model that YOU train on your own labeled dataset. No GPU needed — runs on CPU in ~5-15 minutes.
+
+### Step 1 — Install dependencies
+
+```bash
+cd backend
+venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### Step 2 — Train the model
+
+```bash
+python scripts/train_classifier.py
+```
+
+This will:
+- Load `data/training_data.csv` (95 labeled support tickets across 4 categories)
+- Fine-tune `distilbert-base-uncased` on your data
+- Print a full classification report with accuracy, precision, recall, F1
+- Save YOUR model to `models/ticket_classifier/`
+- Save label map to `models/label_map.json`
+
+### Step 3 — Start the API
+
+```bash
+uvicorn app.main:app --reload
+```
+
+The API will load YOUR trained model automatically. You'll see this in the logs:
+
+```
+classifier_loading_local  path=models/ticket_classifier
+classifier_loaded_local   labels=['Billing Question', 'Feature Request', 'General Inquiry', 'Technical Issue']
+```
+
+### Categories trained on
+
+| Category | Description |
+|---|---|
+| Billing Question | Charges, invoices, refunds, subscriptions |
+| Technical Issue | Crashes, errors, bugs, performance |
+| General Inquiry | How-to questions, documentation |
+| Feature Request | New features, improvements |
+
+### Financial domain sub-classification
+
+On top of your trained model, the system also runs zero-shot classification (no training needed) to map tickets to financial complaint categories from the notebook dataset:
+
+- Credit card or prepaid card
+- Bank account or services
+- Theft or dispute reporting
+- Mortgage or loan
+- Investments or retirement
+
+### Add more training data
+
+Edit `data/training_data.csv` and re-run the training script. More data = better accuracy.
+
+```bash
+python scripts/train_classifier.py
+```
 
 ```bash
 # Load the 20 real-world tickets from CSV

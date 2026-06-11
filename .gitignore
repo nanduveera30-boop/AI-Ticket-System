@@ -29,10 +29,19 @@ backend/.env
 # sentence-transformers downloads models here
 ~/.cache/
 .cache/
-models/
 *.bin
 *.pt
 *.onnx
+
+# Trained model weights — large files, not committed
+# Run: python scripts/train_classifier.py to regenerate
+backend/models/ticket_classifier/pytorch_model.bin
+backend/models/ticket_classifier/model.safetensors
+backend/models/ticket_classifier/optimizer.pt
+backend/models/ticket_classifier/checkpoint-*/
+# Keep label_map.json and training_meta.json tracked
+!backend/models/ticket_classifier/training_meta.json
+!backend/models/label_map.json
 
 # ── FAISS index files (in-memory for MVP, ignore if persisted later) ──────────
 *.index

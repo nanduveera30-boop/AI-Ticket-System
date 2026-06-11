@@ -1,0 +1,12 @@
+{
+  "status": "not_trained",
+  "note": "Run: python scripts/train_classifier.py to train your model",
+  "base_model": "distilbert-base-uncased",
+  "dataset": "data/training_data.csv",
+  "labels": [
+    "Billing Question",
+    "Technical Issue",
+    "General Inquiry",
+    "Feature Request"
+  ]
+}
