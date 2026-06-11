@@ -1,0 +1,21 @@
+title,description,priority,user_type
+Cannot login to account,User cannot login after password reset. Multiple attempts failed with invalid credentials error.,P2,STANDARD
+Billing invoice incorrect,Invoice shows $299 but should be $99. Need refund for overcharge on annual subscription.,P1,VIP
+App crashes on startup,Application crashes immediately on launch with error code 0x80004005 on Windows 10.,P1,STANDARD
+Slow dashboard loading,Dashboard takes over 30 seconds to load. Timeout errors appearing in browser console.,P3,STANDARD
+Unable to update profile,Cannot update profile picture or email address. Form submission returns 422 error.,P2,STANDARD
+VIP account access revoked,VIP user lost access to premium features after billing cycle renewal yesterday.,P2,VIP
+Password reset email not received,User requested password reset but confirmation email not received after 45 minutes.,P3,STANDARD
+Install fails on Windows 11,Installation wizard fails at 67% with error MSI2045. Cannot install on Windows 11.,P2,STANDARD
+Subscription not working after payment,Payment of $49 processed successfully but subscription features still not activated.,P1,VIP
+Error 500 on data export API,Internal server error when calling /api/v2/export endpoint with valid auth token.,P1,STANDARD
+Two-factor authentication not working,2FA codes from authenticator app rejected. Cannot access account for 2 days.,P2,STANDARD
+Refund not processed after 7 days,Refund was approved 7 days ago but amount not returned to credit card yet.,P2,VIP
+Cannot access admin panel,Admin user cannot access management panel after role update by IT department.,P1,STANDARD
+Email notifications not sending,System not sending email alerts for critical events. SMTP logs show no errors.,P3,STANDARD
+Data export stuck at 0%,CSV export job initiated 2 hours ago still shows 0% progress. No error shown.,P2,STANDARD
+Account locked after failed logins,Account locked after 3 failed login attempts. Unlock email not working.,P2,STANDARD
+API rate limit too aggressive,Rate limit of 10 req/min too low for integration use case. Need increase.,P3,STANDARD
+Mobile app not syncing,iOS app not syncing data with web dashboard. Last sync was 3 days ago.,P2,STANDARD
+Wrong currency on invoice,Invoice generated in USD but account is set to EUR. Need corrected invoice.,P2,VIP
+Search returning no results,Search functionality returns empty results for all queries since last update.,P3,STANDARD

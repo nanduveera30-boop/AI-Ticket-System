@@ -1,0 +1,77 @@
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+.env.local
+.env.*.local
+
+# ── Environment variables (keep .env.example, ignore real .env) ───────────────
+backend/.env
+.env
+
+# ── Database ──────────────────────────────────────────────────────────────────
+*.sqlite3
+*.db
+
+# ── ML Models / Cache ─────────────────────────────────────────────────────────
+# sentence-transformers downloads models here
+~/.cache/
+.cache/
+models/
+*.bin
+*.pt
+*.onnx
+
+# ── FAISS index files (in-memory for MVP, ignore if persisted later) ──────────
+*.index
+*.faiss
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+# Keep docker-compose.yml and Dockerfile tracked
+# Ignore local override files
+docker-compose.override.yml
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# ── Node / React / Vite ───────────────────────────────────────────────────────
+node_modules/
+dist/
+.next/
+frontend-react/dist/
+frontend-react/.env
+frontend-react/.env.local
+
+# ── Jupyter ───────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb

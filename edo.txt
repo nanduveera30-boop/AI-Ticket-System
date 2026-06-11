@@ -1,0 +1,12 @@
+AI Pipeline — orchestrates all services for a single ticket.
+
+Steps:
+  1. Generate embedding
+  2. RAG: retrieve similar tickets
+  3. Compute classification_prob (heuristic keyword-based)
+  4. Compute similarity_score (avg top-k cosine scores)
+  5. Evaluate risk
+  6. Compute confidence
+  7. Make decision
+  8. Return structured result with explainability
+"""
