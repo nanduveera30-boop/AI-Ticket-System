@@ -1,108 +1,93 @@
 """
-AI Chat Service — Gemini-powered support assistant.
-Uses ticket context + full conversation history for coherent multi-turn chat.
-Falls back to rule-based responses if Gemini is unavailable.
+AI Chat Service
+===============
+Groq (llama-3.3-70b) as primary — ~0.5s response time.
+Gemini 2.0 Flash as fallback.
+Smart rule-based responses as last resort.
+
+All responses are context-aware: ticket title, description, category,
+priority, AI decision, and full conversation history are injected.
 """
 
-from typing import List, Optional
+from typing import List
 from app.core.config import settings
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-_client = None
+# ── Clients (lazy-loaded) ─────────────────────────────────────────────────────
+_groq_client   = None
+_gemini_client = None
 
-SYSTEM_PROMPT = """You are ResolvAI, an expert customer support AI assistant for a software/tech company.
+SYSTEM_PROMPT = """You are ResolvAI, an expert customer support AI for a software company.
 
-You have access to the customer's ticket details and conversation history.
-Your role is to:
-1. Provide helpful, accurate, and empathetic support responses
-2. Give specific troubleshooting steps when relevant
+You have the customer's full ticket context and conversation history.
+
+Your role:
+1. Give helpful, accurate, empathetic responses
+2. Provide specific troubleshooting steps when relevant
 3. Escalate urgency when the customer indicates critical issues
-4. Keep responses concise but complete (2-4 sentences max unless steps are needed)
-5. Always acknowledge the customer's frustration when present
-6. Never make up information — if unsure, say you'll escalate to a human agent
+4. Keep responses concise (2-4 sentences unless steps are needed)
+5. Acknowledge frustration when present
+6. Never make up information — say you'll escalate if unsure
 
-Tone: Professional, warm, solution-focused. Never robotic.
-"""
+Tone: Professional, warm, solution-focused. Never robotic or generic."""
 
 
-def _get_client():
-    global _client
-    if _client is None and settings.GEMINI_API_KEY:
+def _get_groq():
+    global _groq_client
+    if _groq_client is None and settings.GROQ_API_KEY:
+        try:
+            from groq import Groq
+            _groq_client = Groq(api_key=settings.GROQ_API_KEY)
+            logger.info("groq_client_initialized")
+        except Exception as e:
+            logger.warning("groq_init_failed", error=str(e))
+    return _groq_client
+
+
+def _get_gemini():
+    global _gemini_client
+    if _gemini_client is None and settings.GEMINI_API_KEY:
         try:
             from google import genai
-            _client = genai.Client(api_key=settings.GEMINI_API_KEY)
+            _gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
             logger.info("gemini_client_initialized")
         except Exception as e:
             logger.warning("gemini_init_failed", error=str(e))
-    return _client
+    return _gemini_client
 
 
-# Models to try in order (fastest/cheapest first)
-GEMINI_MODELS = [
-    "gemini-2.0-flash-lite",
-    "gemini-2.0-flash",
-    "gemini-2.5-flash",
-]
-
-
-def _call_gemini(prompt: str) -> str:
-    """Try Gemini models in order, return text or raise."""
-    client = _get_client()
-    if not client:
-        raise RuntimeError("No Gemini client")
-
-    from google import genai
-    last_err = None
-    for model in GEMINI_MODELS:
-        try:
-            response = client.models.generate_content(
-                model=model,
-                contents=prompt,
-            )
-            logger.info("gemini_ok", model=model)
-            return response.text.strip()
-        except Exception as e:
-            err_str = str(e)
-            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
-                logger.warning("gemini_rate_limited", model=model)
-                last_err = e
-                continue  # try next model
-            raise  # non-rate-limit error — propagate
-    raise last_err or RuntimeError("All Gemini models exhausted")
-
-
-def _rule_based_response(ticket_title: str, ticket_desc: str, user_message: str, action: str = "") -> str:
-    """Fallback rule-based responses when Gemini is unavailable."""
+# ── Rule-based fallback ───────────────────────────────────────────────────────
+def _rule_based(ticket_title: str, ticket_desc: str, user_message: str, action: str = "") -> str:
     msg = user_message.lower()
 
-    if any(w in msg for w in ["status", "update", "progress", "when", "how long"]):
+    if any(w in msg for w in ["status", "update", "progress", "when", "how long", "any news"]):
         return (
-            f"Your ticket '{ticket_title}' is being actively reviewed. "
-            "Our team typically responds within 2 business hours. "
-            "I'll notify you as soon as there's an update."
+            f"Your ticket '{ticket_title}' is being actively reviewed by our team. "
+            "We typically respond within 2 business hours. "
+            "I'll make sure you're notified as soon as there's an update."
         )
-    if any(w in msg for w in ["urgent", "critical", "emergency", "asap", "immediately"]):
+    if any(w in msg for w in ["urgent", "critical", "emergency", "asap", "immediately", "now"]):
         return (
             "I understand this is urgent — I'm escalating your ticket to our priority queue right now. "
-            "A senior agent will contact you within 30 minutes. Please stay available."
+            "A senior agent will contact you within 30 minutes. Please stay available on this chat."
         )
-    if any(w in msg for w in ["thank", "thanks", "resolved", "fixed", "working", "solved"]):
+    if any(w in msg for w in ["thank", "thanks", "resolved", "fixed", "working", "solved", "great"]):
         return (
-            "Glad to hear that's resolved! I'll mark this ticket as resolved. "
-            "Don't hesitate to reach out if anything else comes up."
+            "Wonderful, glad to hear that's resolved! I'll mark this ticket as resolved. "
+            "Don't hesitate to reach out if anything else comes up — we're always here to help."
         )
-    if any(w in msg for w in ["cancel", "refund", "charge", "billing", "invoice"]):
+    if any(w in msg for w in ["cancel", "refund", "charge", "billing", "invoice", "overcharged"]):
         return (
-            "I understand your billing concern. I'm flagging this for our billing team to review immediately. "
-            "You'll receive a response within 1 business hour with a resolution."
+            "I understand your billing concern and I'm flagging this for our billing team immediately. "
+            "You'll receive a response within 1 business hour with a full resolution."
         )
     if action == "AUTO_RESOLVE":
         return (
-            f"Based on our AI analysis, your issue with '{ticket_title}' appears to be a known issue "
-            "with an available solution. Could you try the steps in the resolution summary above? "
-            "Let me know if that doesn't work and I'll connect you with a specialist."
+            f"Based on our AI analysis, your issue with '{ticket_title}' matches a known pattern "
+            "with an available solution. Could you try the steps in the resolution summary? "
+            "Let me know if that doesn't work and I'll connect you with a specialist right away."
         )
     if action == "ESCALATE":
         return (
@@ -111,12 +96,53 @@ def _rule_based_response(ticket_title: str, ticket_desc: str, user_message: str,
             "Is there any additional context you'd like to add?"
         )
     return (
-        f"Thank you for reaching out about '{ticket_title}'. "
-        "I've noted your message and a support agent will follow up shortly. "
+        f"Thank you for your message about '{ticket_title}'. "
+        "I've noted your update and a support agent will follow up shortly. "
         "Can you provide any additional details that might help us resolve this faster?"
     )
 
 
+# ── Groq (primary — llama-3.3-70b, ~0.5s) ────────────────────────────────────
+def _call_groq(system: str, user: str) -> str:
+    client = _get_groq()
+    if not client:
+        raise RuntimeError("Groq not configured")
+
+    resp = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user",   "content": user},
+        ],
+        max_tokens=300,
+        temperature=0.4,
+        top_p=0.9,
+    )
+    return resp.choices[0].message.content.strip()
+
+
+# ── Gemini (fallback) ─────────────────────────────────────────────────────────
+GEMINI_MODELS = ["gemini-2.0-flash-lite", "gemini-2.0-flash", "gemini-2.5-flash"]
+
+def _call_gemini(prompt: str) -> str:
+    client = _get_gemini()
+    if not client:
+        raise RuntimeError("Gemini not configured")
+
+    last_err = None
+    for model in GEMINI_MODELS:
+        try:
+            resp = client.models.generate_content(model=model, contents=prompt)
+            return resp.text.strip()
+        except Exception as e:
+            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                last_err = e
+                continue
+            raise
+    raise last_err or RuntimeError("All Gemini models exhausted")
+
+
+# ── Public API ────────────────────────────────────────────────────────────────
 def generate_ai_response(
     ticket_title: str,
     ticket_description: str,
@@ -128,58 +154,46 @@ def generate_ai_response(
     user_message: str,
 ) -> str:
     """
-    Generate a contextual AI response using Gemini with full ticket context.
-
-    Args:
-        ticket_title: The ticket title
-        ticket_description: Full ticket description
-        ticket_category: Category (Technical Issue, Billing, etc.)
-        ticket_priority: P1/P2/P3
-        ai_action: AUTO_RESOLVE / SUGGEST / ESCALATE
-        ai_confidence: 0-1 confidence score
-        conversation_history: List of {role, message} dicts
-        user_message: The latest user message
-
-    Returns:
-        AI response string
+    Generate a contextual AI response.
+    Priority: Groq (fast) → Gemini (fallback) → rule-based (always works).
     """
-    client = _get_client()
+    # Build context block
+    ticket_ctx = (
+        f"TICKET: {ticket_title}\n"
+        f"Description: {ticket_description[:300]}\n"
+        f"Category: {ticket_category} | Priority: {ticket_priority}\n"
+        f"AI Decision: {ai_action} (confidence: {ai_confidence * 100:.0f}%)"
+    )
 
-    if not client:
-        logger.warning("gemini_unavailable_using_fallback")
-        return _rule_based_response(ticket_title, ticket_description, user_message, ai_action)
+    # Build conversation history (last 8 messages)
+    history_lines = []
+    for m in conversation_history[-8:]:
+        role = "Customer" if m.get("sender_role") == "customer" else "ResolvAI"
+        history_lines.append(f"{role}: {m.get('message', '')}")
+    history_block = "\n".join(history_lines)
 
-    # Build context-rich prompt
-    ticket_context = f"""
-TICKET CONTEXT:
-- Title: {ticket_title}
-- Description: {ticket_description}
-- Category: {ticket_category}
-- Priority: {ticket_priority}
-- AI Decision: {ai_action} (confidence: {ai_confidence * 100:.1f}%)
-"""
-
-    # Build conversation history for Gemini
-    history_text = ""
-    if conversation_history:
-        history_text = "\nCONVERSATION HISTORY:\n"
-        for msg in conversation_history[-10:]:  # last 10 messages for context
-            role = "Customer" if msg.get("sender_role") == "customer" else "AI Assistant"
-            history_text += f"{role}: {msg.get('message', '')}\n"
-
-    full_prompt = f"{SYSTEM_PROMPT}\n{ticket_context}{history_text}\nCustomer: {user_message}\n\nAI Assistant:"
-
+    # ── Try Groq first ────────────────────────────────────────────────────────
     try:
-        text = _call_gemini(full_prompt)
-        logger.info("gemini_response_generated", length=len(text))
+        system = f"{SYSTEM_PROMPT}\n\n{ticket_ctx}"
+        user   = f"{history_block}\n\nCustomer: {user_message}" if history_block else f"Customer: {user_message}"
+        text   = _call_groq(system, user)
+        logger.info("ai_response_groq", length=len(text))
         return text
     except Exception as e:
-        err_str = str(e)
-        if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "exhausted" in err_str.lower():
-            logger.warning("gemini_all_models_rate_limited_using_fallback")
-        else:
-            logger.error("gemini_error", error=err_str)
-        return _rule_based_response(ticket_title, ticket_description, user_message, ai_action)
+        logger.warning("groq_failed", error=str(e)[:100])
+
+    # ── Try Gemini ────────────────────────────────────────────────────────────
+    try:
+        prompt = f"{SYSTEM_PROMPT}\n\n{ticket_ctx}\n\n{history_block}\n\nCustomer: {user_message}\n\nResolvAI:"
+        text   = _call_gemini(prompt)
+        logger.info("ai_response_gemini", length=len(text))
+        return text
+    except Exception as e:
+        logger.warning("gemini_failed", error=str(e)[:100])
+
+    # ── Rule-based fallback ───────────────────────────────────────────────────
+    logger.info("ai_response_rule_based")
+    return _rule_based(ticket_title, ticket_description, user_message, ai_action)
 
 
 def generate_ticket_explanation(
@@ -193,31 +207,35 @@ def generate_ticket_explanation(
     reason: str,
 ) -> str:
     """
-    Generate a human-readable AI explanation for the ticket result panel.
+    Generate a human-readable explanation for the result panel.
+    Uses Groq for speed, Gemini as fallback, raw reason as last resort.
     """
-    client = _get_client()
+    prompt_content = (
+        f"A customer submitted a support ticket and our AI analyzed it.\n"
+        f"Write a clear, friendly 2-3 sentence explanation of what the AI found and what happens next.\n"
+        f"Do NOT use bullet points. Write in plain conversational English.\n\n"
+        f"Ticket: \"{ticket_title}\"\n"
+        f"Description: \"{ticket_description[:200]}\"\n"
+        f"AI Decision: {action} | Risk: {risk} | Confidence: {confidence * 100:.0f}%\n"
+        f"Category: {ticket_category} | Domain: {financial_category}\n"
+        f"Technical reason: {reason}\n\n"
+        f"Write the explanation now:"
+    )
 
-    if not client:
-        return reason
-
-    prompt = f"""You are ResolvAI. A customer submitted a support ticket and our AI analyzed it.
-Write a clear, friendly 2-3 sentence explanation of what the AI found and what happens next.
-Do NOT use bullet points. Write in plain conversational English.
-
-Ticket: "{ticket_title}"
-Description: "{ticket_description[:200]}"
-AI Decision: {action}
-Risk Level: {risk}
-Confidence: {confidence * 100:.1f}%
-Category: {ticket_category}
-Domain: {financial_category}
-Technical reason: {reason}
-
-Write the explanation now:"""
-
+    # Try Groq
     try:
-        text = _call_gemini(prompt)
+        text = _call_groq("You are ResolvAI, a support AI. Be concise and friendly.", prompt_content)
+        logger.info("explanation_groq")
         return text
-    except Exception as e:
-        logger.warning("gemini_explanation_failed", error=str(e))
-        return reason
+    except Exception:
+        pass
+
+    # Try Gemini
+    try:
+        text = _call_gemini(f"You are ResolvAI. {prompt_content}")
+        logger.info("explanation_gemini")
+        return text
+    except Exception:
+        pass
+
+    return reason

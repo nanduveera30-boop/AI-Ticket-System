@@ -69,8 +69,9 @@ CATEGORY_ICONS = {
 def get_whisper_model():
     global _whisper_model
     if _whisper_model is None:
-        # Try 'small' first for better accuracy, fall back to 'base'
-        for model_size in ("small", "base"):
+        # 'tiny' = fastest (39M params, ~1s on CPU), 'base' = balanced (74M, ~2s)
+        # For production accuracy use 'small' (244M, ~5s)
+        for model_size in ("tiny", "base"):
             try:
                 logger.info("whisper_loading", model=model_size)
                 _whisper_model = whisper.load_model(model_size)
@@ -159,10 +160,9 @@ def transcribe_audio(audio_bytes: bytes, file_ext: str = "webm") -> str:
             audio,
             language="en",
             fp16=False,
-            # Better accuracy settings
-            temperature=0.0,          # deterministic
+            temperature=0.0,   # deterministic — no sampling overhead
             best_of=1,
-            beam_size=5,              # beam search for accuracy
+            beam_size=1,       # greedy decode — 3x faster than beam_size=5
             condition_on_previous_text=False,
         )
         transcript = result["text"].strip()

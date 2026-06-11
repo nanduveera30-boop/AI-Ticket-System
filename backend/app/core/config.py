@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     # Gemini AI
     GEMINI_API_KEY: str = ""
 
+    # Groq AI (llama-3.3-70b — ultra-fast inference)
+    GROQ_API_KEY: str = ""
+
+    # Groq AI (Llama 3.3 70B — ~500 tokens/sec, free tier)
+    GROQ_API_KEY: str = ""
+
     # CORS — comma-separated origins
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
 

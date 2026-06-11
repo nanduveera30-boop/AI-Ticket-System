@@ -28,11 +28,13 @@ client.interceptors.response.use(
     }
 
     // Retry on network errors or 5xx (max 2 retries, exponential backoff)
+    // NEVER retry multipart/form-data — FormData stream is consumed after first send
+    const isMultipart = config.headers?.["Content-Type"]?.includes("multipart/form-data");
     const isNetworkError = !error.response;
     const isServerError  = error.response?.status >= 500;
     config._retryCount   = config._retryCount || 0;
 
-    if ((isNetworkError || isServerError) && config._retryCount < 2) {
+    if (!isMultipart && !config._noRetry && (isNetworkError || isServerError) && config._retryCount < 2) {
       config._retryCount += 1;
       config._isRetry = true;
       const delay = config._retryCount * 1000; // 1s, 2s
