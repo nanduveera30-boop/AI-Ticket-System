@@ -1,3 +1,7 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# Confidence-Governed AI Ticket Resolution System — .gitignore
+# ═══════════════════════════════════════════════════════════════════════════════
+
 # ── Python ───────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
@@ -6,7 +10,6 @@ __pycache__/
 *.so
 *.egg
 *.egg-info/
-dist/
 build/
 .eggs/
 
@@ -14,73 +17,103 @@ build/
 venv/
 .venv/
 env/
+ENV/
+
+# ── Environment variables ─────────────────────────────────────────────────────
+# NEVER commit real .env files — use .env.example as template
+.env
 .env.local
 .env.*.local
-
-# ── Environment variables (keep .env.example, ignore real .env) ───────────────
 backend/.env
-.env
+frontend-react/.env
+frontend-react/.env.local
 
 # ── Database ──────────────────────────────────────────────────────────────────
 *.sqlite3
 *.db
+test.db
 
-# ── ML Models / Cache ─────────────────────────────────────────────────────────
-# sentence-transformers downloads models here
-~/.cache/
-.cache/
+# ── FAISS persisted index (generated at runtime, not source code) ─────────────
+backend/data/faiss.index
+backend/data/faiss_meta.json
+*.faiss
+*.index
+
+# ── ML model weights (large binary files — regenerate with train_classifier.py)
 *.bin
 *.pt
 *.onnx
-
-# Trained model weights — large files, not committed
-# Run: python scripts/train_classifier.py to regenerate
+*.safetensors
 backend/models/ticket_classifier/pytorch_model.bin
 backend/models/ticket_classifier/model.safetensors
 backend/models/ticket_classifier/optimizer.pt
 backend/models/ticket_classifier/checkpoint-*/
-# Keep label_map.json and training_meta.json tracked
+backend/models/ticket_classifier/runs/
+# Keep metadata files — they document the model without storing weights
 !backend/models/ticket_classifier/training_meta.json
+!backend/models/ticket_classifier/config.json
+!backend/models/ticket_classifier/tokenizer*.json
+!backend/models/ticket_classifier/vocab.txt
+!backend/models/ticket_classifier/special_tokens_map.json
 !backend/models/label_map.json
 
-# ── FAISS index files (in-memory for MVP, ignore if persisted later) ──────────
-*.index
-*.faiss
-
-# ── Docker ────────────────────────────────────────────────────────────────────
-# Keep docker-compose.yml and Dockerfile tracked
-# Ignore local override files
-docker-compose.override.yml
+# ── HuggingFace / Whisper model cache (downloaded automatically) ──────────────
+.cache/
+backend/.cache/
+backend/venv/Lib/site-packages/~crypt/
 
 # ── Logs ──────────────────────────────────────────────────────────────────────
 *.log
 logs/
+*.log.*
 
-# ── OS ────────────────────────────────────────────────────────────────────────
+# ── OS generated ──────────────────────────────────────────────────────────────
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 desktop.ini
 
-# ── IDE ───────────────────────────────────────────────────────────────────────
+# ── IDE / Editor ──────────────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
 # ── Testing ───────────────────────────────────────────────────────────────────
 .pytest_cache/
 .coverage
 htmlcov/
 coverage.xml
+.tox/
 
 # ── Node / React / Vite ───────────────────────────────────────────────────────
 node_modules/
-dist/
-.next/
+frontend-react/node_modules/
 frontend-react/dist/
-frontend-react/.env
-frontend-react/.env.local
+frontend-react/.vite/
+.next/
+out/
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+docker-compose.override.yml
+.docker/
 
 # ── Jupyter ───────────────────────────────────────────────────────────────────
 .ipynb_checkpoints/
 *.ipynb
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+*.tmp
+*.temp
+*.bak
+*.orig
+edo.txt

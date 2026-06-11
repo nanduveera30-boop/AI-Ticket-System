@@ -18,9 +18,12 @@ from app.core.exceptions import (
 from app.db.database import engine
 from app.db.models import Base
 from app.routes import tickets, metrics, auth
+from app.routes.voice import router as voice_router
+from app.routes.admin import router as admin_router
 from app.services.embeddings import get_model
 from app.services.rag import load_index
 from app.services.classifier import get_ticket_classifier, get_zero_shot_classifier
+from app.services.voice import get_whisper_model
 from app.utils.logger import configure_logging, get_logger
 
 configure_logging()
@@ -38,6 +41,7 @@ async def lifespan(app: FastAPI):
     get_model()
     get_ticket_classifier()
     get_zero_shot_classifier()
+    get_whisper_model()
     logger.info("startup_complete")
     yield
     logger.info("shutdown")
@@ -89,3 +93,5 @@ async def request_id_middleware(request: Request, call_next):
 app.include_router(auth.router)
 app.include_router(tickets.router)
 app.include_router(metrics.router)
+app.include_router(voice_router)
+app.include_router(admin_router)

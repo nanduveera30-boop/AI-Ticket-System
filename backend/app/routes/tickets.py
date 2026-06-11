@@ -111,6 +111,38 @@ def get_ticket_prediction(
     }
 
 
+@router.post("/tickets/check-duplicate")
+def check_duplicate(
+    payload: TicketCreate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Duplicate detection — checks FAISS for highly similar existing tickets.
+    Returns matches above 0.92 cosine similarity threshold.
+    """
+    from app.services.embeddings import generate_embedding
+    from app.services.rag import search_similar
+
+    embedding = generate_embedding(f"{payload.title}. {payload.description}")
+    matches = search_similar(embedding, top_k=3)
+
+    duplicates = [
+        {"ticket_id": tid, "title": title, "similarity": round(score, 4)}
+        for tid, title, score in matches
+        if score >= 0.92
+    ]
+
+    return {
+        "is_duplicate": len(duplicates) > 0,
+        "duplicates": duplicates,
+        "message": (
+            f"This issue already exists. Follow Ticket #{duplicates[0]['ticket_id']}"
+            if duplicates else "No duplicate found"
+        ),
+    }
+
+
 @router.get("/audit-logs", response_model=List[dict])
 def get_audit_logs(
     skip: int = Query(0, ge=0),
