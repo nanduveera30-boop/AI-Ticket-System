@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { getChatHistory, sendMessage } from "../../api/chat";
 import { getTicket, getTicketPrediction } from "../../api/tickets";
 
@@ -8,6 +8,13 @@ const STATUS_CLS = {
 };
 const ACTION_CLS = { AUTO_RESOLVE: "badge-green", SUGGEST: "badge-yellow", ESCALATE: "badge-red" };
 const RISK_CLS   = { LOW: "badge-green", HIGH: "badge-red" };
+
+const QUICK_REPLIES = [
+  "What's the status of my ticket?",
+  "Can you help me troubleshoot this?",
+  "This is urgent, I need help now.",
+  "Has anyone looked at this yet?",
+];
 
 function TypingIndicator() {
   return (
@@ -35,9 +42,13 @@ export default function TicketDetailPage({ ticketId, user, token, onBack }) {
   const [aiTyping, setAiTyping] = useState(false);
   const [wsReady, setWsReady]   = useState(false);
   const [loading, setLoading]   = useState(true);
-  const wsRef     = useRef(null);
-  const bottomRef = useRef(null);
-  const inputRef  = useRef(null);
+  const [wsError, setWsError]   = useState(null);
+
+  const wsRef        = useRef(null);
+  const bottomRef    = useRef(null);
+  const inputRef     = useRef(null);
+  const reconnectRef = useRef(null);
+  const retryCount   = useRef(0);
 
   useEffect(() => {
     if (!ticketId) return;
@@ -49,15 +60,34 @@ export default function TicketDetailPage({ ticketId, user, token, onBack }) {
     ]).finally(() => setLoading(false));
   }, [ticketId]);
 
-  // WebSocket
-  useEffect(() => {
+  // WebSocket with auto-reconnect
+  const connectWS = useCallback(() => {
     if (!ticketId || !token) return;
     const apiBase = (import.meta.env.VITE_API_URL || "http://localhost:8000").replace(/^http/, "ws");
     const ws = new WebSocket(`${apiBase}/ws/chat/${ticketId}?token=${token}`);
     wsRef.current = ws;
-    ws.onopen  = () => setWsReady(true);
-    ws.onclose = () => setWsReady(false);
+
+    ws.onopen = () => {
+      setWsReady(true);
+      setWsError(null);
+      retryCount.current = 0;
+    };
+
+    ws.onclose = (e) => {
+      setWsReady(false);
+      setAiTyping(false);
+      // Auto-reconnect with exponential backoff (max 5 attempts)
+      if (retryCount.current < 5 && e.code !== 4001 && e.code !== 4004) {
+        const delay = Math.min(1000 * 2 ** retryCount.current, 30000);
+        retryCount.current += 1;
+        reconnectRef.current = setTimeout(connectWS, delay);
+      } else if (retryCount.current >= 5) {
+        setWsError("Connection lost. Refresh to reconnect.");
+      }
+    };
+
     ws.onerror = () => setWsReady(false);
+
     ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
@@ -65,15 +95,22 @@ export default function TicketDetailPage({ ticketId, user, token, onBack }) {
         setMessages(prev => prev.find(m => m.id === msg.id) ? prev : [...prev, msg]);
       } catch { /* ignore */ }
     };
-    return () => ws.close();
   }, [ticketId, token]);
+
+  useEffect(() => {
+    connectWS();
+    return () => {
+      clearTimeout(reconnectRef.current);
+      wsRef.current?.close(1000);
+    };
+  }, [connectWS]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, aiTyping]);
 
   async function handleSend(e) {
-    e.preventDefault();
+    e?.preventDefault();
     if (!input.trim() || sending) return;
     const text = input.trim();
     setInput("");
@@ -86,22 +123,33 @@ export default function TicketDetailPage({ ticketId, user, token, onBack }) {
         // REST fallback
         const msg = await sendMessage(ticketId, text);
         setMessages(prev => [...prev, msg]);
-        // Reload to get AI reply
-        setTimeout(() => {
-          getChatHistory(ticketId).then(setMessages).catch(() => {});
-        }, 1500);
+        setTimeout(() => getChatHistory(ticketId).then(setMessages).catch(() => {}), 1500);
       }
     } catch { /* handled */ }
     finally {
       setSending(false);
-      inputRef.current?.focus();
+      setTimeout(() => inputRef.current?.focus(), 50);
     }
+  }
+
+  function handleKeyDown(e) {
+    // Ctrl+Enter or Cmd+Enter to send
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      handleSend();
+    }
+  }
+
+  function handleQuickReply(q) {
+    setInput(q);
+    setTimeout(() => inputRef.current?.focus(), 50);
   }
 
   if (!ticketId) {
     return (
       <div className="cpage">
         <div className="empty-state">
+          <span className="material-symbols-outlined" style={{ fontSize: 40, display: "block", margin: "0 auto 12px", color: "var(--outline)" }}>confirmation_number</span>
           <p>No ticket selected.</p>
           {onBack && <button className="btn-primary" style={{ marginTop: 16 }} onClick={onBack}>Back to My Tickets</button>}
         </div>
@@ -122,14 +170,20 @@ export default function TicketDetailPage({ ticketId, user, token, onBack }) {
 
   return (
     <div className="cpage-wide">
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+      {/* Breadcrumb */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
         {onBack && (
           <button className="btn-ghost btn-sm" onClick={onBack}>
             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span>
             My Tickets
           </button>
         )}
-        {ticket && <span style={{ fontSize: 13, color: "var(--on-surface-variant)" }}>Ticket #{ticket.id}</span>}
+        {ticket && (
+          <>
+            <span style={{ color: "var(--outline-variant)" }}>/</span>
+            <span style={{ fontSize: 13, color: "var(--on-surface-variant)" }}>Ticket #{ticket.id}</span>
+          </>
+        )}
       </div>
 
       <div className="ticket-detail-layout">
@@ -161,7 +215,8 @@ export default function TicketDetailPage({ ticketId, user, token, onBack }) {
                   ))}
                 </div>
 
-                {prediction && (
+                {/* AI Analysis */}
+                {prediction ? (
                   <div className="ai-analysis-box">
                     <div className="ai-analysis-title">
                       <span className="material-symbols-outlined" style={{ fontSize: 12, marginRight: 4 }}>psychology</span>
@@ -193,6 +248,26 @@ export default function TicketDetailPage({ ticketId, user, token, onBack }) {
                       </div>
                     )}
                   </div>
+                ) : (
+                  <div style={{ marginTop: 16, padding: "12px 14px", background: "var(--surface-container-low)", borderRadius: "var(--r2)", fontSize: 12, color: "var(--on-surface-variant)", display: "flex", alignItems: "center", gap: 8 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>hourglass_empty</span>
+                    AI analysis pending…
+                  </div>
+                )}
+
+                {/* Attachment */}
+                {ticket.attachment_url && (
+                  <div style={{ marginTop: 14 }}>
+                    <a
+                      href={`${import.meta.env.VITE_API_URL || "http://localhost:8000"}${ticket.attachment_url}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--primary-container)", fontWeight: 600, textDecoration: "none" }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>attach_file</span>
+                      View Attachment
+                    </a>
+                  </div>
                 )}
               </>
             ) : (
@@ -213,16 +288,21 @@ export default function TicketDetailPage({ ticketId, user, token, onBack }) {
                 <div style={{ fontSize: 11, color: "var(--on-surface-variant)" }}>Powered by Gemini · Knows your ticket</div>
               </div>
             </div>
-            <span className={`ws-status ${wsReady ? "online" : "offline"}`}>
-              {wsReady ? "● Live" : "○ Connecting…"}
-            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {wsError && (
+                <span style={{ fontSize: 11, color: "var(--error)", fontWeight: 600 }}>{wsError}</span>
+              )}
+              <span className={`ws-status ${wsReady ? "online" : "offline"}`}>
+                {wsReady ? "● Live" : retryCount.current > 0 ? `↻ Reconnecting (${retryCount.current}/5)` : "○ Offline"}
+              </span>
+            </div>
           </div>
 
-          {/* Ticket context banner */}
+          {/* Context banner */}
           {ticket && messages.length === 0 && (
             <div style={{ padding: "10px 20px", background: "var(--primary-fixed)", borderBottom: "1px solid var(--surface-container-low)", fontSize: 12, color: "var(--on-primary-fixed)", display: "flex", alignItems: "center", gap: 8 }}>
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>info</span>
-              AI has full context of your ticket: <strong>"{ticket.title}"</strong>
+              AI has full context of: <strong style={{ marginLeft: 4 }}>"{ticket.title}"</strong>
             </div>
           )}
 
@@ -231,14 +311,14 @@ export default function TicketDetailPage({ ticketId, user, token, onBack }) {
               <div className="chat-empty">
                 <span className="material-symbols-outlined" style={{ fontSize: 36, display: "block", margin: "0 auto 10px", color: "var(--outline)" }}>chat_bubble_outline</span>
                 <p style={{ fontWeight: 600, marginBottom: 6 }}>Ask ResolvAI anything</p>
-                <p style={{ fontSize: 12 }}>The AI knows your ticket details and can help troubleshoot, provide updates, or escalate your issue.</p>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginTop: 14 }}>
-                  {["What's the status of my ticket?", "Can you help me troubleshoot?", "I need urgent help"].map(q => (
+                <p style={{ fontSize: 12, marginBottom: 16 }}>The AI knows your ticket and can help troubleshoot, provide updates, or escalate.</p>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
+                  {QUICK_REPLIES.map(q => (
                     <button
                       key={q}
                       className="btn-ghost btn-sm"
                       style={{ fontSize: 11, borderRadius: 100, border: "1px solid var(--outline-variant)" }}
-                      onClick={() => { setInput(q); inputRef.current?.focus(); }}
+                      onClick={() => handleQuickReply(q)}
                     >
                       {q}
                     </button>
@@ -272,9 +352,10 @@ export default function TicketDetailPage({ ticketId, user, token, onBack }) {
               ref={inputRef}
               className="form-input chat-input"
               type="text"
-              placeholder="Ask ResolvAI about your ticket…"
+              placeholder="Ask ResolvAI… (Ctrl+Enter to send)"
               value={input}
               onChange={e => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
               disabled={sending}
               maxLength={1000}
             />
@@ -282,7 +363,7 @@ export default function TicketDetailPage({ ticketId, user, token, onBack }) {
               type="submit"
               className="btn-primary"
               disabled={sending || !input.trim()}
-              title="Send message"
+              title="Send (Ctrl+Enter)"
             >
               {sending
                 ? <span className="material-symbols-outlined" style={{ fontSize: 16 }}>hourglass_empty</span>

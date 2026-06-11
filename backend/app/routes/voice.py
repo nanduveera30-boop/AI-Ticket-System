@@ -5,8 +5,10 @@ POST /voice/transcribe   — transcribe audio, return text only
 POST /voice/process      — transcribe + run full AI pipeline, return ticket result
 """
 
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, BackgroundTasks, Request
 from sqlalchemy.orm import Session
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.db.database import get_db
 from app.db.models import Ticket
@@ -19,6 +21,7 @@ from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/voice", tags=["voice"])
+limiter = Limiter(key_func=get_remote_address)
 
 ALLOWED_TYPES = {
     "audio/webm", "audio/webm;codecs=opus", "audio/webm;codecs=vp8",
@@ -56,7 +59,9 @@ def _get_extension(file: UploadFile) -> str:
 
 
 @router.post("/transcribe")
+@limiter.limit("10/minute")
 async def transcribe(
+    request: Request,
     audio: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
 ):
@@ -88,7 +93,9 @@ async def transcribe(
 
 
 @router.post("/process", response_model=ProcessTicketResponse)
+@limiter.limit("5/minute")
 async def voice_process(
+    request: Request,
     audio: UploadFile = File(...),
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),

@@ -1,10 +1,9 @@
 """
-RAG service — FAISS vector store with disk persistence.
-Index is saved to FAISS_INDEX_PATH on every write so it survives restarts.
+RAG service — FAISS vector store with disk persistence and thread safety.
 """
 
 import json
-import os
+import threading
 from pathlib import Path
 from typing import List, Tuple
 
@@ -16,10 +15,11 @@ from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-EMBEDDING_DIM = 384  # all-MiniLM-L6-v2
+EMBEDDING_DIM = 384
 
 _index: faiss.IndexFlatIP | None = None
 _metadata: List[dict] = []
+_lock = threading.Lock()
 
 
 def _index_path() -> Path:
@@ -31,7 +31,6 @@ def _meta_path() -> Path:
 
 
 def load_index() -> None:
-    """Load FAISS index and metadata from disk if they exist."""
     global _index, _metadata
     idx_path = _index_path()
     meta_path = _meta_path()
@@ -52,7 +51,6 @@ def load_index() -> None:
 
 
 def _save_index() -> None:
-    """Persist index and metadata to disk."""
     try:
         idx_path = _index_path()
         idx_path.parent.mkdir(parents=True, exist_ok=True)
@@ -71,22 +69,23 @@ def _get_index() -> faiss.IndexFlatIP:
 
 
 def add_to_index(ticket_id: int, title: str, description: str, embedding: np.ndarray) -> None:
-    index = _get_index()
-    vec = embedding.reshape(1, -1).astype(np.float32)
-    index.add(vec)
-    _metadata.append({"ticket_id": ticket_id, "title": title, "description": description})
-    _save_index()
+    with _lock:
+        index = _get_index()
+        vec = embedding.reshape(1, -1).astype(np.float32)
+        index.add(vec)
+        _metadata.append({"ticket_id": ticket_id, "title": title, "description": description})
+        _save_index()
     logger.info("faiss_ticket_added", ticket_id=ticket_id, total=index.ntotal)
 
 
 def search_similar(embedding: np.ndarray, top_k: int = 3) -> List[Tuple[int, str, float]]:
-    index = _get_index()
-    if index.ntotal == 0:
-        return []
-
-    k = min(top_k, index.ntotal)
-    vec = embedding.reshape(1, -1).astype(np.float32)
-    scores, indices = index.search(vec, k)
+    with _lock:
+        index = _get_index()
+        if index.ntotal == 0:
+            return []
+        k = min(top_k, index.ntotal)
+        vec = embedding.reshape(1, -1).astype(np.float32)
+        scores, indices = index.search(vec, k)
 
     results = []
     for score, idx in zip(scores[0], indices[0]):

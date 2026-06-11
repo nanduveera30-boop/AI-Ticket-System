@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+import time
+from typing import Optional
 
 from app.db.database import get_db
 from app.db.models import Prediction, Ticket, AuditLog
@@ -12,39 +14,53 @@ from app.utils.logger import get_logger
 logger = get_logger(__name__)
 router = APIRouter(tags=["metrics"])
 
+# Simple in-memory cache (TTL = 30 seconds)
+_metrics_cache: dict = {}
+_CACHE_TTL = 30
+
+
+def _cached(key: str, ttl: int, fn):
+    now = time.time()
+    if key in _metrics_cache:
+        val, ts = _metrics_cache[key]
+        if now - ts < ttl:
+            return val
+    val = fn()
+    _metrics_cache[key] = (val, now)
+    return val
+
 
 @router.get("/metrics", response_model=MetricsResponse)
 def get_metrics(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    total_tickets = db.query(func.count(Ticket.id)).scalar() or 0
+    def _compute():
+        total_tickets = db.query(func.count(Ticket.id)).scalar() or 0
+        action_counts = (
+            db.query(Prediction.action, func.count(Prediction.id))
+            .group_by(Prediction.action).all()
+        )
+        counts = {action: cnt for action, cnt in action_counts}
+        auto_resolved = counts.get("AUTO_RESOLVE", 0)
+        escalated     = counts.get("ESCALATE", 0)
+        suggested     = counts.get("SUGGEST", 0)
+        total_preds   = auto_resolved + escalated + suggested
+        avg_confidence = db.query(func.avg(Prediction.confidence)).scalar() or 0.0
 
-    action_counts = (
-        db.query(Prediction.action, func.count(Prediction.id))
-        .group_by(Prediction.action)
-        .all()
-    )
-    counts = {action: cnt for action, cnt in action_counts}
-    auto_resolved = counts.get("AUTO_RESOLVE", 0)
-    escalated     = counts.get("ESCALATE", 0)
-    suggested     = counts.get("SUGGEST", 0)
-    total_preds   = auto_resolved + escalated + suggested
+        def pct(n): return round(n / total_preds * 100, 2) if total_preds > 0 else 0.0
 
-    avg_confidence = db.query(func.avg(Prediction.confidence)).scalar() or 0.0
+        return MetricsResponse(
+            total_tickets=total_tickets,
+            auto_resolved_count=auto_resolved,
+            escalated_count=escalated,
+            suggested_count=suggested,
+            auto_resolved_pct=pct(auto_resolved),
+            escalated_pct=pct(escalated),
+            avg_confidence=round(float(avg_confidence), 4),
+        )
 
-    def pct(n: int) -> float:
-        return round(n / total_preds * 100, 2) if total_preds > 0 else 0.0
-
-    return MetricsResponse(
-        total_tickets=total_tickets,
-        auto_resolved_count=auto_resolved,
-        escalated_count=escalated,
-        suggested_count=suggested,
-        auto_resolved_pct=pct(auto_resolved),
-        escalated_pct=pct(escalated),
-        avg_confidence=round(float(avg_confidence), 4),
-    )
+    return _cached("metrics", _CACHE_TTL, _compute)
 
 
 @router.get("/metrics/detailed", response_model=dict)

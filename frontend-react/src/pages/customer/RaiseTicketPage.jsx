@@ -54,7 +54,11 @@ export default function RaiseTicketPage({ token, onTicketCreated }) {
   const isRecording  = recState === "recording";
   const hasRecording = recState === "done" && audioBlob;
 
-  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+  const set = k => e => {
+    setForm(f => ({ ...f, [k]: e.target.value }));
+    // Clear field error as user types
+    if (errors[k]) setErrors(prev => ({ ...prev, [k]: undefined }));
+  };
 
   function validate() {
     const e = {};
@@ -512,6 +516,7 @@ export default function RaiseTicketPage({ token, onTicketCreated }) {
                 maxLength={255}
                 value={form.title}
                 onChange={set("title")}
+                disabled={loading}
                 style={errors.title ? { boxShadow: "0 0 0 2px rgba(186,26,26,0.3)" } : {}}
               />
               {errors.title && <span style={{ fontSize: 12, color: "var(--error)" }}>{errors.title}</span>}
@@ -520,13 +525,13 @@ export default function RaiseTicketPage({ token, onTicketCreated }) {
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Priority</label>
-                <select className="form-select" value={form.priority} onChange={set("priority")}>
+                <select className="form-select" value={form.priority} onChange={set("priority")} disabled={loading}>
                   {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                 </select>
               </div>
               <div className="form-group">
                 <label className="form-label">Account Type</label>
-                <select className="form-select" value={form.user_type} onChange={set("user_type")}>
+                <select className="form-select" value={form.user_type} onChange={set("user_type")} disabled={loading}>
                   <option value="STANDARD">Standard</option>
                   <option value="VIP">VIP</option>
                 </select>
@@ -544,6 +549,7 @@ export default function RaiseTicketPage({ token, onTicketCreated }) {
                   maxLength={2000}
                   value={form.description}
                   onChange={set("description")}
+                  disabled={loading}
                   style={{ minHeight: 140, ...(errors.description ? { boxShadow: "0 0 0 2px rgba(186,26,26,0.3)" } : {}) }}
                 />
                 <span className="char-count">{form.description.length}/2000</span>

@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -23,7 +24,7 @@ from app.routes.admin import router as admin_router
 from app.routes.chat import router as chat_router
 from app.routes.faq import router as faq_router
 from app.services.embeddings import get_model
-from app.services.rag import load_index
+from app.services.rag import load_index, _save_index
 from app.services.classifier import get_ticket_classifier, get_zero_shot_classifier
 from app.services.voice import get_whisper_model
 from app.utils.logger import configure_logging, get_logger
@@ -31,9 +32,7 @@ from app.utils.logger import configure_logging, get_logger
 configure_logging()
 logger = get_logger(__name__)
 
-# Rate limiter
 limiter = Limiter(key_func=get_remote_address, default_limits=[f"{settings.RATE_LIMIT_PER_MINUTE}/minute"])
-
 
 from app.workers.tasks import auto_escalate_tickets
 import asyncio
@@ -47,12 +46,15 @@ async def lifespan(app: FastAPI):
     get_ticket_classifier()
     get_zero_shot_classifier()
     get_whisper_model()
-    
-    # Start auto-escalation worker
     escalate_task = asyncio.create_task(auto_escalate_tickets())
-    
     logger.info("startup_complete")
     yield
+    # Graceful shutdown — persist FAISS index
+    try:
+        _save_index()
+        logger.info("faiss_index_saved_on_shutdown")
+    except Exception as e:
+        logger.error("faiss_shutdown_save_failed", error=str(e))
     escalate_task.cancel()
     logger.info("shutdown")
 
@@ -66,11 +68,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Rate limiting
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS
+# GZip compression for responses > 1KB
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.origins_list,
@@ -79,15 +82,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Exception handlers
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(Exception, unhandled_exception_handler)
 
-# Prometheus metrics at /metrics-prom
 Instrumentator().instrument(app).expose(app, endpoint="/metrics-prom", include_in_schema=False)
 
-# Request ID middleware for tracing
 @app.middleware("http")
 async def request_id_middleware(request: Request, call_next):
     import uuid
@@ -99,13 +99,11 @@ async def request_id_middleware(request: Request, call_next):
     response.headers["X-Request-ID"] = request_id
     return response
 
-# Static files for uploads
 from fastapi.staticfiles import StaticFiles
 import os
 os.makedirs("data/uploads", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="data/uploads"), name="uploads")
 
-# Routers
 app.include_router(auth.router)
 app.include_router(tickets.router)
 app.include_router(metrics.router)

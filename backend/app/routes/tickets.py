@@ -263,10 +263,32 @@ async def upload_attachment(
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
 ):
-    ext = file.filename.split(".")[-1]
-    filename = f"{secrets.token_hex(8)}.{ext}"
+    # Validate file type
+    ALLOWED_TYPES = {
+        "image/jpeg", "image/png", "image/gif", "image/webp",
+        "application/pdf", "text/plain",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    }
+    MAX_SIZE_BYTES = 5 * 1024 * 1024  # 5MB
+
+    content = await file.read()
+    if len(content) > MAX_SIZE_BYTES:
+        raise HTTPException(status_code=413, detail="File exceeds 5MB limit")
+
+    ct = (file.content_type or "").split(";")[0].strip()
+    if ct and ct not in ALLOWED_TYPES:
+        raise HTTPException(
+            status_code=415,
+            detail=f"File type not allowed. Supported: images, PDF, text, Word documents"
+        )
+
+    ext = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "bin"
+    filename = f"{secrets.token_hex(12)}.{ext}"
     os.makedirs("data/uploads", exist_ok=True)
     filepath = f"data/uploads/{filename}"
     with open(filepath, "wb") as f:
-        f.write(await file.read())
-    return {"attachment_url": f"/uploads/{filename}"}
+        f.write(content)
+
+    logger.info("attachment_uploaded", filename=filename, size=len(content), actor=current_user["username"])
+    return {"attachment_url": f"/uploads/{filename}", "filename": file.filename, "size": len(content)}

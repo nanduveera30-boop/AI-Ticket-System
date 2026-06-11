@@ -52,6 +52,10 @@ def persist_prediction(db: Session, result: ProcessTicketResponse) -> None:
             confidence=result.confidence,
             risk=result.risk,
             action=result.action,
+            ticket_category=result.explanation.ticket_category,
+            financial_category=result.explanation.financial_category,
+            ai_explanation=result.explanation.reason,
+            apology_message=result.explanation.apology_message,
         )
         db.add(prediction)
         db.commit()

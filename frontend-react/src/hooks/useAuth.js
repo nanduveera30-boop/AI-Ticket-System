@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import client from "../api/client";
 
 export function useAuth() {
@@ -8,7 +8,6 @@ export function useAuth() {
       const u = localStorage.getItem("user");
       if (!u) return null;
       const parsed = JSON.parse(u);
-      // If stored user has no role, it's stale — force re-login
       if (!parsed?.role) {
         localStorage.removeItem("user");
         localStorage.removeItem("token");
@@ -26,6 +25,16 @@ export function useAuth() {
   if (token && user) {
     client.defaults.headers.common["Authorization"] = `Bearer ${token}`;
   }
+
+  // Listen for global 401 logout event from API client
+  useEffect(() => {
+    const handleLogout = () => {
+      setToken(null);
+      setUser(null);
+    };
+    window.addEventListener("auth:logout", handleLogout);
+    return () => window.removeEventListener("auth:logout", handleLogout);
+  }, []);
 
   const fetchMe = useCallback(async () => {
     const res = await client.get("/auth/me");
