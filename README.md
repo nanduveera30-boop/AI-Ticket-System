@@ -10,29 +10,29 @@ Built with FastAPI, PostgreSQL, FAISS, Sentence Transformers, Whisper, and React
 
 ```mermaid
 graph TB
-    subgraph Frontend["Frontend — React + Vite"]
+    subgraph Frontend["Frontend - React + Vite"]
         UI[Dashboard / Tickets / Audit]
         VA[Voice Assistant]
         AP[Admin Portal]
     end
 
-    subgraph API["Backend — FastAPI"]
-        AUTH[Auth Routes<br/>/auth/*]
-        TR[Ticket Routes<br/>/tickets/*]
-        VR[Voice Routes<br/>/voice/*]
-        MR[Metrics Routes<br/>/metrics/*]
-        AR[Admin Routes<br/>/admin/*]
+    subgraph API["Backend - FastAPI"]
+        AUTH[Auth Routes /auth]
+        TR[Ticket Routes /tickets]
+        VR[Voice Routes /voice]
+        MR[Metrics Routes /metrics]
+        AR[Admin Routes /admin]
     end
 
     subgraph AI["AI Pipeline"]
-        EMB[Embeddings<br/>all-MiniLM-L6-v2]
-        FAISS[FAISS Vector Store<br/>RAG Similarity Search]
-        CLF[DistilBERT Classifier<br/>Your Trained Model]
-        ZS[Zero-Shot BART<br/>Financial Categories]
-        CONF[Confidence Engine<br/>Weighted Formula]
-        RISK[Risk Engine<br/>Rule-Based]
-        DEC[Decision Engine<br/>AUTO / SUGGEST / ESCALATE]
-        WHISPER[Whisper Base<br/>Voice Transcription]
+        EMB[Embeddings all-MiniLM-L6-v2]
+        FAISS[FAISS Vector Store RAG]
+        CLF[DistilBERT Classifier]
+        ZS[Zero-Shot BART]
+        CONF[Confidence Engine]
+        RISK[Risk Engine]
+        DEC[Decision Engine]
+        WHISPER[Whisper Base Voice]
     end
 
     subgraph DB["PostgreSQL"]
@@ -78,11 +78,11 @@ flowchart LR
     E --> F
 
     A --> G[DistilBERT Classifier\nYour Trained Model]
-    G --> H[classification_prob\n= score × resolvability]
+    G --> H[classification_prob\n= score x resolvability]
 
     A --> I[BART Zero-Shot\nFinancial Category]
 
-    A --> J[Risk Engine\nP1 or VIP → HIGH]
+    A --> J[Risk Engine\nP1 or VIP = HIGH]
     J --> K[risk_adjustment\nLOW=0.2 HIGH=0.0]
 
     F --> L[Confidence Formula]
@@ -90,9 +90,9 @@ flowchart LR
     K --> L
 
     L --> M{Confidence\nThreshold}
-    M -- "> 0.92 AND LOW risk" --> N([AUTO_RESOLVE])
-    M -- "> 0.60" --> O([SUGGEST])
-    M -- "else" --> P([ESCALATE])
+    M -->|above 0.92 AND LOW risk| N([AUTO_RESOLVE])
+    M -->|above 0.60| O([SUGGEST])
+    M -->|else| P([ESCALATE])
 
     N --> Q[Persist to DB\nAudit Log]
     O --> Q
@@ -105,14 +105,14 @@ flowchart LR
 
 ```mermaid
 graph LR
-    A[classification_prob × 0.35] --> E[Confidence Score]
-    B[similarity_score × 0.35] --> E
-    C[historical_success × 0.20] --> E
-    D[risk_adjustment × 0.10] --> E
-    E --> F{"> 0.92 AND LOW?"}
-    F -- Yes --> G[AUTO_RESOLVE]
-    F -- No, "> 0.60" --> H[SUGGEST]
-    F -- No --> I[ESCALATE]
+    A[classification_prob x 0.35] --> E[Confidence Score]
+    B[similarity_score x 0.35] --> E
+    C[historical_success x 0.20] --> E
+    D[risk_adjustment x 0.10] --> E
+    E --> F{Above 0.92 AND LOW risk?}
+    F -->|Yes| G[AUTO_RESOLVE]
+    F -->|No, above 0.60| H[SUGGEST]
+    F -->|No| I[ESCALATE]
 ```
 
 ---
